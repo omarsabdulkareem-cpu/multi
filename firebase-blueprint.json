@@ -1,0 +1,362 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with industrial roles and permissions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "nameAr": { "type": "string" },
+        "role": { "type": "string" },
+        "badgeNumber": { "type": "string" },
+        "department": { "type": "string" },
+        "departmentAr": { "type": "string" }
+      },
+      "required": ["id", "name", "role"]
+    },
+    "MaterialItem": {
+      "title": "MaterialItem",
+      "description": "Raw, shredded, or finished material catalog item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "nameAr": { "type": "string" },
+        "nameEn": { "type": "string" },
+        "category": { "type": "string" },
+        "unit": { "type": "string" },
+        "minStockKG": { "type": "number" },
+        "maxStockKG": { "type": "number" },
+        "requiresShredding": { "type": "boolean" },
+        "active": { "type": "boolean" },
+        "status": { "type": "string" },
+        "isQuarantined": { "type": "boolean" },
+        "isExpired": { "type": "boolean" },
+        "expiryDate": { "type": "string" },
+        "quarantineReason": { "type": "string" }
+      },
+      "required": ["id", "code", "nameAr", "category"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Material vendor and logistics supplier record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "nameAr": { "type": "string" },
+        "nameEn": { "type": "string" },
+        "phone": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "nameAr"]
+    },
+    "Warehouse": {
+      "title": "Warehouse",
+      "description": "Factory storage zone or facility warehouse",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "referenceCode": { "type": "string" },
+        "nameAr": { "type": "string" },
+        "nameEn": { "type": "string" },
+        "type": { "type": "string" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["id", "code", "nameAr"]
+    },
+    "WarehouseLocation": {
+      "title": "WarehouseLocation",
+      "description": "Specific bay, aisle or rack within a warehouse",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "warehouseId": { "type": "string" },
+        "code": { "type": "string" },
+        "referenceCode": { "type": "string" },
+        "nameAr": { "type": "string" },
+        "capacityKG": { "type": "number" }
+      },
+      "required": ["id", "warehouseId", "code"]
+    },
+    "InventoryBalance": {
+      "title": "InventoryBalance",
+      "description": "Current on-hand stock for a material at a specific warehouse and location",
+      "type": "object",
+      "properties": {
+        "materialId": { "type": "string" },
+        "materialCode": { "type": "string" },
+        "materialName": { "type": "string" },
+        "warehouseId": { "type": "string" },
+        "warehouseName": { "type": "string" },
+        "locationId": { "type": "string" },
+        "locationCode": { "type": "string" },
+        "bulkBagsCount": { "type": "number" },
+        "availableKG": { "type": "number" },
+        "reservedKG": { "type": "number" },
+        "totalBalanceKG": { "type": "number" }
+      },
+      "required": ["materialId", "warehouseId", "locationId", "totalBalanceKG"]
+    },
+    "InventoryMovement": {
+      "title": "InventoryMovement",
+      "description": "Immutable ledger entry of inventory movement",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "movementId": { "type": "string" },
+        "movementType": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "materialId": { "type": "string" },
+        "quantityKG": { "type": "number" },
+        "bulkBagsCount": { "type": "number" },
+        "referenceDocument": { "type": "string" },
+        "user": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "movementType", "materialId", "quantityKG", "referenceDocument"]
+    },
+    "BulkBag": {
+      "title": "BulkBag",
+      "description": "Individual bulk bag / شليف tracking unit with unique barcode ID",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "bagNumber": { "type": "string" },
+        "materialId": { "type": "string" },
+        "materialName": { "type": "string" },
+        "weightKG": { "type": "number" },
+        "warehouseId": { "type": "string" },
+        "locationId": { "type": "string" },
+        "status": { "type": "string" },
+        "sourceTransactionId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "bagNumber", "materialId", "weightKG", "status"]
+    },
+    "ReceivingTransaction": {
+      "title": "ReceivingTransaction",
+      "description": "Truck weighbridge scale and raw material receiving transaction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "transactionNumber": { "type": "string" },
+        "legacyDocumentNumber": { "type": "string" },
+        "supplierId": { "type": "string" },
+        "materialId": { "type": "string" },
+        "scaleInWeightKG": { "type": "number" },
+        "scaleOutWeightKG": { "type": "number" },
+        "netReceivedWeightKG": { "type": "number" },
+        "bulkBagsCount": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "transactionNumber", "materialId", "status"]
+    },
+    "ShreddingTransaction": {
+      "title": "ShreddingTransaction",
+      "description": "Therm / الثرم shredding operational run",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "shreddingNumber": { "type": "string" },
+        "materialId": { "type": "string" },
+        "inputKG": { "type": "number" },
+        "outputKG": { "type": "number" },
+        "productionDamageKG": { "type": "number" },
+        "varianceKG": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "shreddingNumber", "materialId", "inputKG", "status"]
+    },
+    "ProductionOrder": {
+      "title": "ProductionOrder",
+      "description": "Manufacturing production order for sheets and cups",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "productName": { "type": "string" },
+        "requiredMaterialId": { "type": "string" },
+        "plannedKG": { "type": "number" },
+        "actualInputKG": { "type": "number" },
+        "actualProductionKG": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "orderNumber", "productName", "requiredMaterialId", "status"]
+    },
+    "ProductionIssue": {
+      "title": "ProductionIssue",
+      "description": "Material issue note to production line (Doc 167)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "issueNumber": { "type": "string" },
+        "materialId": { "type": "string" },
+        "quantityKG": { "type": "number" },
+        "machineLine": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "issueNumber", "materialId", "quantityKG", "machineLine"]
+    },
+    "PendingAction": {
+      "title": "PendingAction",
+      "description": "Task pending action required across factory modules",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "priority": { "type": "string" },
+        "transactionType": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "currentStep": { "type": "string" },
+        "missingStep": { "type": "string" },
+        "targetView": { "type": "string" }
+      },
+      "required": ["id", "priority", "transactionId", "targetView"]
+    },
+    "AuditLogEntry": {
+      "title": "AuditLogEntry",
+      "description": "Immutable security and audit trail log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "action": { "type": "string" },
+        "entityType": { "type": "string" },
+        "entityId": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "userName", "action", "entityType", "entityId"]
+    },
+    "CloudStorageSnapshotRecord": {
+      "title": "CloudStorageSnapshotRecord",
+      "description": "Daily snapshot archive metadata with Firebase Storage link and 30-day retention countdown",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fileName": { "type": "string" },
+        "storagePath": { "type": "string" },
+        "storageBucket": { "type": "string" },
+        "downloadUrl": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "expiresAt": { "type": "string" },
+        "retentionDays": { "type": "number" },
+        "totalDocuments": { "type": "number" },
+        "payloadSizeKB": { "type": "number" },
+        "autoScheduled": { "type": "boolean" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "fileName", "storagePath", "storageBucket", "createdAt", "expiresAt"]
+    },
+    "CloudSchedulerConfig": {
+      "title": "CloudSchedulerConfig",
+      "description": "Automated daily snapshot schedule configuration and retention enforcement state",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "dailyRunTime": { "type": "string" },
+        "timezone": { "type": "string" },
+        "retentionDays": { "type": "number" },
+        "autoPurgeExpired": { "type": "boolean" },
+        "lastRunTimestamp": { "type": "string" },
+        "lastRunStatus": { "type": "string" },
+        "nextScheduledRun": { "type": "string" }
+      },
+      "required": ["id", "enabled", "dailyRunTime", "retentionDays"]
+    },
+    "SystemInventoryCode": {
+      "title": "SystemInventoryCode",
+      "description": "Configurable AL-KARWAN internal inventory and movement transaction codes (e.g., 167 for Storage, 546 for Production)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "nameAr": { "type": "string" },
+        "nameEn": { "type": "string" },
+        "category": { "type": "string" },
+        "descriptionAr": { "type": "string" },
+        "descriptionEn": { "type": "string" },
+        "prefix": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "isSystemDefault": { "type": "boolean" },
+        "updatedAt": { "type": "string" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["id", "code", "nameAr", "category", "isActive"]
+    }
+  },
+  "firestore": {
+    "/systemInventoryCodes/{codeId}": {
+      "schema": "SystemInventoryCode",
+      "description": "Configurable AL-KARWAN internal inventory and movement transaction codes"
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Factory users and assigned operators"
+    },
+    "/materials/{materialId}": {
+      "schema": "MaterialItem",
+      "description": "Raw and recycled plastic catalog"
+    },
+    "/suppliers/{supplierId}": {
+      "schema": "Supplier",
+      "description": "Suppliers and delivery history"
+    },
+    "/warehouses/{warehouseId}": {
+      "schema": "Warehouse",
+      "description": "Factory storage facilities and sections"
+    },
+    "/warehouseLocations/{locationId}": {
+      "schema": "WarehouseLocation",
+      "description": "Specific warehouse locations, racks, and bays"
+    },
+    "/inventoryBalances/{balanceId}": {
+      "schema": "InventoryBalance",
+      "description": "Current balances per material and location"
+    },
+    "/inventoryMovements/{movementId}": {
+      "schema": "InventoryMovement",
+      "description": "Central auditable inventory ledger entries"
+    },
+    "/bulkBags/{bagId}": {
+      "schema": "BulkBag",
+      "description": "Individual bulk bag / شليف tracking"
+    },
+    "/receivingTransactions/{txId}": {
+      "schema": "ReceivingTransaction",
+      "description": "Truck scale and raw receiving transactions"
+    },
+    "/shreddingTransactions/{txId}": {
+      "schema": "ShreddingTransaction",
+      "description": "Therm / shredding production records"
+    },
+    "/productionOrders/{orderId}": {
+      "schema": "ProductionOrder",
+      "description": "Manufacturing orders for sheet and cup lines"
+    },
+    "/productionIssues/{issueId}": {
+      "schema": "ProductionIssue",
+      "description": "Material issued to production lines"
+    },
+    "/pendingActions/{actionId}": {
+      "schema": "PendingAction",
+      "description": "Incomplete workflows and operational reminders"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "AuditLogEntry",
+      "description": "Comprehensive auditable operational history"
+    },
+    "/cloudSnapshots/{snapshotId}": {
+      "schema": "CloudStorageSnapshotRecord",
+      "description": "Daily snapshot archives stored in Firebase Storage"
+    },
+    "/cloudSchedulerConfig/{configId}": {
+      "schema": "CloudSchedulerConfig",
+      "description": "Automated snapshot scheduler settings and retention policies"
+    }
+  }
+}

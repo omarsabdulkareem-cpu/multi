@@ -1,0 +1,11 @@
+{
+  "name": "Remix AL-KARWAN Factory Control System",
+  "description": "Enterprise factory warehouse, scale, receiving, shredding (الثرم), energy efficiency monitoring, storage, and production management system for Al-Karwan Plastic Factory.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,463 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for security validation
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\.]+$');
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getUserRole() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? getUserData().role : '';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'karwanpet2@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        getUserRole() in ['SUPER_ADMIN', 'Administrator', 'PLATFORM_OWNER', 'PLATFORM_ADMIN']
+      );
+    }
+
+    function isPlatformAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email in ['karwanpet2@gmail.com', 'admin@alkarwan.com', 'owner@warehouse-saas.com', 'platform@admin.com'] ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         getUserData().role in ['SUPER_ADMIN', 'PLATFORM_OWNER', 'PLATFORM_ADMIN'])
+      );
+    }
+
+    function isOrgMember(orgId) {
+      return isSignedIn() && (
+        isPlatformAdmin() ||
+        orgId == null ||
+        orgId == 'org-alkarwan-default' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         getUserData().organizationId == orgId)
+      );
+    }
+
+    function isStorageManager() {
+      return isSignedIn() && (
+        isAdmin() ||
+        getUserRole() in [
+          'Warehouse Manager',
+          'StorageManager',
+          'Storekeeper',
+          'Supervisor',
+          'General Supervisor'
+        ]
+      );
+    }
+
+    function isAuthorizedOperator() {
+      return isSignedIn() && (
+        isStorageManager() ||
+        getUserRole() in [
+          'Warehouse Operator',
+          'Scale Operator',
+          'Shredding Operator',
+          'Production Operator'
+        ]
+      );
+    }
+
+    // Admins registry
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() && isValidId(adminId);
+    }
+
+    // Factory user accounts & profiles
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && (isOwner(userId) || isAdmin()) && isValidId(userId);
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    // Raw, shredded, & finished material catalog
+    match /materials/{materialId} {
+      allow read: if isSignedIn();
+      allow write: if (isStorageManager() || isAdmin()) && isValidId(materialId);
+    }
+
+    // Material vendors & suppliers
+    match /suppliers/{supplierId} {
+      allow read: if isSignedIn();
+      allow write: if (isStorageManager() || isAdmin()) && isValidId(supplierId);
+    }
+
+    // Storage warehouses & facilities
+    match /warehouses/{warehouseId} {
+      allow read: if isSignedIn();
+      allow write: if (isStorageManager() || isAdmin()) && isValidId(warehouseId);
+    }
+
+    // Warehouse racks, aisles & bins
+    match /warehouseLocations/{locationId} {
+      allow read: if isSignedIn();
+      allow write: if (isStorageManager() || isAdmin()) && isValidId(locationId);
+    }
+
+    // Real-time on-hand stock balances (Restricted to Authorized Inventory Roles & Operators)
+    match /inventoryBalances/{balanceId} {
+      allow read: if isSignedIn();
+      allow create, update: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(balanceId);
+      allow delete: if isAdmin() && isValidId(balanceId);
+    }
+    match /inventory_balances/{balanceId} {
+      allow read: if isSignedIn();
+      allow create, update: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(balanceId);
+      allow delete: if isAdmin() && isValidId(balanceId);
+    }
+
+    // Unified factory transactions
+    match /transactions/{txId} {
+      allow read: if isSignedIn();
+      allow create, update: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(txId);
+      allow delete: if isAdmin() && isValidId(txId);
+    }
+
+    // Central immutable inventory ledger
+    match /inventoryMovements/{movementId} {
+      allow read: if isSignedIn();
+      allow create: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(movementId);
+      allow update, delete: if isAdmin() && isValidId(movementId);
+    }
+    match /inventory_movements/{movementId} {
+      allow read: if isSignedIn();
+      allow create: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(movementId);
+      allow update, delete: if isAdmin() && isValidId(movementId);
+    }
+
+    // Bulk bag unit barcode tracking (شليف)
+    match /bulkBags/{bagId} {
+      allow read: if isSignedIn();
+      allow write: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(bagId);
+    }
+    match /bulk_bags/{bagId} {
+      allow read: if isSignedIn();
+      allow write: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(bagId);
+    }
+
+    // Receiving & scale weighbridge transactions
+    match /receivingTransactions/{txId} {
+      allow read: if isSignedIn();
+      allow create, update: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(txId);
+      allow delete: if isAdmin() && isValidId(txId);
+    }
+    match /receiving_transactions/{txId} {
+      allow read: if isSignedIn();
+      allow create, update: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(txId);
+      allow delete: if isAdmin() && isValidId(txId);
+    }
+
+    // Shredding (الثرم) operational runs
+    match /shreddingTransactions/{txId} {
+      allow read: if isSignedIn();
+      allow create, update: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(txId);
+      allow delete: if isAdmin() && isValidId(txId);
+    }
+    match /shredding_transactions/{txId} {
+      allow read: if isSignedIn();
+      allow create, update: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(txId);
+      allow delete: if isAdmin() && isValidId(txId);
+    }
+
+    // Production orders (Sheets & Thermoforming)
+    match /productionOrders/{orderId} {
+      allow read: if isSignedIn();
+      allow write: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(orderId);
+    }
+    match /production_orders/{orderId} {
+      allow read: if isSignedIn();
+      allow write: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(orderId);
+    }
+
+    // Production issues & dispatches (Doc 167)
+    match /productionIssues/{issueId} {
+      allow read: if isSignedIn();
+      allow create, update: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(issueId);
+      allow delete: if isAdmin() && isValidId(issueId);
+    }
+    match /production_issues/{issueId} {
+      allow read: if isSignedIn();
+      allow create, update: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(issueId);
+      allow delete: if isAdmin() && isValidId(issueId);
+    }
+
+    // Production scrap & damages
+    match /productionDamages/{damageId} {
+      allow read: if isSignedIn();
+      allow write: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(damageId);
+    }
+
+    // Shift handover records
+    match /shiftHandovers/{handoverId} {
+      allow read: if isSignedIn();
+      allow write: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(handoverId);
+    }
+    match /shift_handovers/{handoverId} {
+      allow read: if isSignedIn();
+      allow write: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(handoverId);
+    }
+
+    // Internal warehouse location transfers
+    match /warehouseTransfers/{transferId} {
+      allow read: if isSignedIn();
+      allow create, update: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(transferId);
+      allow delete: if isAdmin() && isValidId(transferId);
+    }
+    match /warehouse_transfers/{transferId} {
+      allow read: if isSignedIn();
+      allow create, update: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(transferId);
+      allow delete: if isAdmin() && isValidId(transferId);
+    }
+
+    // Physical count stocktakes
+    match /physicalCounts/{countId} {
+      allow read: if isSignedIn();
+      allow create, update: if (isStorageManager() || isAdmin()) && isValidId(countId);
+      allow delete: if isAdmin() && isValidId(countId);
+    }
+    match /physical_counts/{countId} {
+      allow read: if isSignedIn();
+      allow create, update: if (isStorageManager() || isAdmin()) && isValidId(countId);
+      allow delete: if isAdmin() && isValidId(countId);
+    }
+
+    // Purchase requirements
+    match /purchaseRequirements/{reqId} {
+      allow read: if isSignedIn();
+      allow write: if (isStorageManager() || isAdmin()) && isValidId(reqId);
+    }
+    match /purchase_requirements/{reqId} {
+      allow read: if isSignedIn();
+      allow write: if (isStorageManager() || isAdmin()) && isValidId(reqId);
+    }
+
+    // Import batch logs
+    match /importBatches/{batchId} {
+      allow read: if isSignedIn();
+      allow write: if (isStorageManager() || isAdmin()) && isValidId(batchId);
+    }
+
+    // Incomplete operational workflows & alerts
+    match /pendingActions/{actionId} {
+      allow read, write: if isSignedIn() && isValidId(actionId);
+    }
+    match /pending_actions/{actionId} {
+      allow read, write: if isSignedIn() && isValidId(actionId);
+    }
+
+    // Security & supervisory approvals
+    match /approvals/{approvalId} {
+      allow read: if isSignedIn();
+      allow create: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(approvalId);
+      allow update: if (isStorageManager() || isAdmin()) && isValidId(approvalId);
+      allow delete: if isAdmin() && isValidId(approvalId);
+    }
+
+    // System configurations & parameters
+    match /systemSettings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() && isValidId(settingId);
+    }
+
+    // Configurable internal inventory & transaction codes (e.g., 167 for Storage, 546 for Production)
+    match /systemInventoryCodes/{codeId} {
+      allow read: if isSignedIn();
+      allow write: if (isStorageManager() || isAdmin()) && isValidId(codeId);
+    }
+
+    // Machine fleet & equipment records
+    match /machines/{machineId} {
+      allow read: if isSignedIn();
+      allow write: if (isStorageManager() || isAdmin()) && isValidId(machineId);
+    }
+
+    // Maintenance logs & schedules
+    match /maintenanceLogs/{logId} {
+      allow read: if isSignedIn();
+      allow write: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(logId);
+    }
+
+    // Audit trails (Tamper-proof append only by authenticated users, modifications/deletions restricted to Administrators)
+    match /auditLogs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(logId);
+      allow update, delete: if isAdmin() && isValidId(logId);
+    }
+    match /audit_logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(logId);
+      allow update, delete: if isAdmin() && isValidId(logId);
+    }
+
+    // Cloud Automated Snapshots & Scheduler Configuration
+    match /cloudSchedulerConfig/{configId} {
+      allow read: if isSignedIn();
+      allow write: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(configId);
+    }
+    match /cloudSnapshots/{snapshotId} {
+      allow read: if isSignedIn();
+      allow write: if (isAuthorizedOperator() || isStorageManager() || isAdmin()) && isValidId(snapshotId);
+    }
+
+    // Health check test document
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+
+    // =========================================================================
+    // MULTI-TENANT WAREHOUSE OPERATIONS & UNIVERSAL ENGINE COLLECTIONS
+    // =========================================================================
+    match /organizations/{orgId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(orgId));
+      allow write: if (isPlatformAdmin() || (isOrgMember(orgId) && isAdmin())) && isValidId(orgId);
+    }
+
+    match /tenant_members/{memberId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow write: if (isPlatformAdmin() || isAdmin()) && isValidId(memberId);
+    }
+
+    match /tenant_invitations/{invitationId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow write: if (isPlatformAdmin() || isAdmin()) && isValidId(invitationId);
+    }
+
+    match /tenant_roles/{roleId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow write: if (isPlatformAdmin() || isAdmin()) && isValidId(roleId);
+    }
+
+    match /tenant_audit_logs/{logId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow create: if isSignedIn() && (isPlatformAdmin() || isOrgMember(request.resource.data.organizationId)) && isValidId(logId);
+      allow update, delete: if isPlatformAdmin() && isValidId(logId);
+    }
+
+    match /universal_warehouses/{whId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow create: if isSignedIn() && (isPlatformAdmin() || (isOrgMember(request.resource.data.organizationId) && isStorageManager())) && isValidId(whId);
+      allow update, delete: if isSignedIn() && (isPlatformAdmin() || (isOrgMember(resource.data.organizationId) && isStorageManager())) && isValidId(whId);
+    }
+
+    match /universal_locations/{locId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow create: if isSignedIn() && (isPlatformAdmin() || (isOrgMember(request.resource.data.organizationId) && isStorageManager())) && isValidId(locId);
+      allow update, delete: if isSignedIn() && (isPlatformAdmin() || (isOrgMember(resource.data.organizationId) && isStorageManager())) && isValidId(locId);
+    }
+
+    match /universal_items/{itemId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow create: if isSignedIn() && (isPlatformAdmin() || (isOrgMember(request.resource.data.organizationId) && isStorageManager())) && isValidId(itemId);
+      allow update, delete: if isSignedIn() && (isPlatformAdmin() || (isOrgMember(resource.data.organizationId) && isStorageManager())) && isValidId(itemId);
+    }
+
+    match /universal_ledger/{txId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow create: if isSignedIn() && (isPlatformAdmin() || (isOrgMember(request.resource.data.organizationId) && isAuthorizedOperator())) && isValidId(txId);
+      allow update, delete: if isPlatformAdmin() && isValidId(txId);
+    }
+
+    match /universal_receipts/{docId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow create, update: if isSignedIn() && (isPlatformAdmin() || (isOrgMember(request.resource.data.organizationId) && isAuthorizedOperator())) && isValidId(docId);
+      allow delete: if (isPlatformAdmin() || (isOrgMember(resource.data.organizationId) && isAdmin())) && isValidId(docId);
+    }
+
+    match /universal_issues/{docId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow create, update: if isSignedIn() && (isPlatformAdmin() || (isOrgMember(request.resource.data.organizationId) && isAuthorizedOperator())) && isValidId(docId);
+      allow delete: if (isPlatformAdmin() || (isOrgMember(resource.data.organizationId) && isAdmin())) && isValidId(docId);
+    }
+
+    match /universal_transfers/{docId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow create, update: if isSignedIn() && (isPlatformAdmin() || (isOrgMember(request.resource.data.organizationId) && isAuthorizedOperator())) && isValidId(docId);
+      allow delete: if (isPlatformAdmin() || (isOrgMember(resource.data.organizationId) && isAdmin())) && isValidId(docId);
+    }
+
+    match /universal_adjustments/{docId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow create, update: if isSignedIn() && (isPlatformAdmin() || (isOrgMember(request.resource.data.organizationId) && isAuthorizedOperator())) && isValidId(docId);
+      allow delete: if (isPlatformAdmin() || (isOrgMember(resource.data.organizationId) && isAdmin())) && isValidId(docId);
+    }
+
+    match /universal_returns/{docId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow create, update: if isSignedIn() && (isPlatformAdmin() || (isOrgMember(request.resource.data.organizationId) && isAuthorizedOperator())) && isValidId(docId);
+      allow delete: if (isPlatformAdmin() || (isOrgMember(resource.data.organizationId) && isAdmin())) && isValidId(docId);
+    }
+
+    match /universal_stocktakes/{docId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow create, update: if isSignedIn() && (isPlatformAdmin() || (isOrgMember(request.resource.data.organizationId) && isAuthorizedOperator())) && isValidId(docId);
+      allow delete: if (isPlatformAdmin() || (isOrgMember(resource.data.organizationId) && isAdmin())) && isValidId(docId);
+    }
+
+    // SaaS Commercial, Billing & Platform Governance collections
+    match /saas_plans/{planId} {
+      allow read: if isSignedIn();
+      allow write: if isPlatformAdmin() && isValidId(planId);
+    }
+
+    match /saas_subscriptions/{subId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow write: if isPlatformAdmin() && isValidId(subId);
+    }
+
+    match /saas_invoices/{invoiceId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow write: if isPlatformAdmin() && isValidId(invoiceId);
+    }
+
+    match /platform_settings/{docId} {
+      allow read, write: if isPlatformAdmin() && isValidId(docId);
+    }
+
+    match /platform_audit_logs/{logId} {
+      allow read, write: if isPlatformAdmin() && isValidId(logId);
+    }
+
+    match /system_backups/{backupId} {
+      allow read, write: if isPlatformAdmin() && isValidId(backupId);
+    }
+
+    // Webhooks & Event Delivery collections
+    match /webhook_endpoints/{endpointId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow write: if isSignedIn() && (isPlatformAdmin() || (isOrgMember(request.resource.data.organizationId) && isAdmin())) && isValidId(endpointId);
+    }
+
+    match /webhook_events/{eventId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow write: if isSignedIn() && (isPlatformAdmin() || (isOrgMember(request.resource.data.organizationId) && isAuthorizedOperator())) && isValidId(eventId);
+    }
+
+    match /webhook_deliveries/{deliveryId} {
+      allow read: if isSignedIn() && (isPlatformAdmin() || isOrgMember(resource.data.organizationId));
+      allow write: if isSignedIn() && (isPlatformAdmin() || (isOrgMember(request.resource.data.organizationId) && isAuthorizedOperator())) && isValidId(deliveryId);
+    }
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
